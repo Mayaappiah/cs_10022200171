@@ -218,20 +218,12 @@ if "memory"   not in st.session_state: st.session_state.memory   = ConversationM
 if "store"    not in st.session_state: st.session_state.store    = None
 if "messages" not in st.session_state: st.session_state.messages = []
 
-# ── load / rebuild index ──────────────────────────────────────────────────────
-@st.cache_resource(show_spinner="⏳ Building knowledge index … (first run ~30 s)")
+# ── index loader (no blocking spinner at top level) ───────────────────────────
+@st.cache_resource
 def load_store(force: bool = False):
     return build_index(ELECTION_CSV, BUDGET_PDF, force_rebuild=force)
 
-if rebuild:
-    st.cache_resource.clear()
-    st.session_state.store = load_store(force=True)
-elif st.session_state.store is None:
-    st.session_state.store = load_store()
-
-store = st.session_state.store
-
-# ── tabs ──────────────────────────────────────────────────────────────────────
+# ── tabs — rendered IMMEDIATELY before any loading ───────────────────────────
 tab_chat, tab_eval, tab_logs = st.tabs(["💬 Chat", "⚖️ RAG vs LLM", "📋 Logs"])
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -240,6 +232,25 @@ tab_chat, tab_eval, tab_logs = st.tabs(["💬 Chat", "⚖️ RAG vs LLM", "📋 
 with tab_chat:
     st.header("💬 Chat with Ghana Data")
     st.caption("Ask questions about Ghana Presidential Elections (1992–2020) or the 2025 Budget Statement.")
+
+    # ── Load index INSIDE the tab so the UI always renders first ─────────────
+    if rebuild:
+        st.cache_resource.clear()
+        st.session_state.store = None
+
+    if st.session_state.store is None:
+        with st.status("⏳ Loading knowledge index …", expanded=True) as status:
+            try:
+                st.write("📂 Reading data files …")
+                st.session_state.store = load_store(force=rebuild)
+                st.write("✅ Index loaded — 768 chunks ready!")
+                status.update(label="✅ Knowledge index ready!", state="complete", expanded=False)
+            except Exception as e:
+                status.update(label="❌ Index failed to load", state="error")
+                st.error(f"Error: {e}")
+                st.stop()
+
+    store = st.session_state.store
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -321,8 +332,12 @@ with tab_eval:
         if not api_key:
             st.warning("⚠️ Please enter your Anthropic API key in the sidebar.")
             st.stop()
+        if st.session_state.store is None:
+            st.warning("⚠️ Please visit the Chat tab first to load the index.")
+            st.stop()
 
         col_rag, col_llm = st.columns(2)
+        store = st.session_state.store
 
         with col_rag:
             st.subheader("✅ RAG Response")
