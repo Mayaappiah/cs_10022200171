@@ -1,0 +1,23 @@
+# Secrets — NEVER commit your API key
+.streamlit/secrets.toml
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+env/
+
+# Large model cache (sentence-transformers downloads locally)
+.cache/
+
+# Claude Code internal folder
+.claude/
+
+# Logs (optional — remove this line if you want logs in git)
+logs/pipeline_log.jsonl
+logs/chat_history.json
