@@ -17,7 +17,6 @@ Course : CS4241 - Introduction to Artificial Intelligence | ACity 2026
 """
 import os
 import sys
-import base64
 import streamlit as st
 
 # ── path fix ────────────────────────────────────────────────────────────────
@@ -32,7 +31,6 @@ from rag.memory import ConversationMemory
 DATA_DIR     = os.path.join(BASE_DIR, "data")
 ELECTION_CSV = os.path.join(DATA_DIR, "Ghana_Election_Result.csv")
 BUDGET_PDF   = os.path.join(DATA_DIR, "2025-Budget-Statement-and-Economic-Policy_v4.pdf")
-BG_IMAGE     = os.path.join(BASE_DIR, "assets", "background.jpg")
 DEFAULT_TOP_K = 5
 
 # ── page config ──────────────────────────────────────────────────────────────
@@ -43,107 +41,21 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── background image with blur ───────────────────────────────────────────────
-def get_base64(path: str) -> str:
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-def apply_background(image_path: str) -> None:
-    """Inject CSS that sets a blurred campus background image."""
-    img_b64 = get_base64(image_path)
-    css = f"""
-    <style>
-    /* ── Blurred background layer ── */
-    .stApp {{
-        position: relative;
-        background: transparent;
-    }}
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        inset: -20px;           /* overshoot edges so blur doesn't show white */
-        background-image: url("data:image/jpeg;base64,{img_b64}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        filter: blur(6px) brightness(0.72);
-        z-index: -1;
-    }}
-
-    /* ── Dark scrim over background for readability ── */
-    .stApp::after {{
-        content: "";
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 30, 10, 0.35);
-        z-index: -1;
-    }}
-
-    /* ── Sidebar — solid white so it stays crisp ── */
-    [data-testid="stSidebar"] {{
-        background-color: rgba(255, 255, 255, 0.96) !important;
-        border-right: 1px solid #e0e0e0;
-    }}
-
-    /* ── Main content panels — frosted-glass card ── */
-    .main .block-container {{
-        background-color: rgba(255, 255, 255, 0.90);
-        border-radius: 14px;
-        padding: 2rem 2.5rem;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(2px);
-    }}
-
-    /* ── Chat messages — slightly opaque bubble ── */
-    [data-testid="stChatMessage"] {{
-        background-color: rgba(255, 255, 255, 0.85) !important;
-        border-radius: 10px;
-        padding: 0.5rem;
-    }}
-
-    /* ── Tab bar ── */
-    [data-baseweb="tab-list"] {{
-        background-color: rgba(255,255,255,0.80);
-        border-radius: 8px;
-        padding: 4px;
-    }}
-
-    /* ── Expanders ── */
-    [data-testid="stExpander"] {{
-        background-color: rgba(255,255,255,0.82);
-        border-radius: 8px;
-    }}
-
-    /* ── Headers ── */
-    h1, h2, h3 {{
-        color: #003300 !important;
-    }}
-
-    /* ── Green accent for primary buttons ── */
-    .stButton > button {{
+# ── clean minimal styling (no background image) ──────────────────────────────
+st.markdown("""
+<style>
+    .stButton > button {
         background-color: #006400;
         color: white;
         border: none;
         border-radius: 6px;
-    }}
-    .stButton > button:hover {{
+    }
+    .stButton > button:hover {
         background-color: #004d00;
         color: white;
-    }}
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-
-# Apply background only if the image file exists
-if os.path.exists(BG_IMAGE):
-    apply_background(BG_IMAGE)
-else:
-    # Fallback: plain green-tinted background if image not yet saved
-    st.markdown("""
-    <style>
-    .stApp { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); }
-    </style>
-    """, unsafe_allow_html=True)
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ── sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
