@@ -1,6 +1,6 @@
 # CS4241 — Introduction to Artificial Intelligence (2026)
 **RAG Chatbot: Ghana Elections + 2025 Budget Statement**  
-Academic City University · Faculty of Computational Sciences and Informatics
+
 
 ---
 
@@ -14,7 +14,7 @@ Academic City University · Faculty of Computational Sciences and Informatics
 | **Institution** | Academic City University College |
 | **Year** | 2026 |
 
-> **Live App:** *(add your Streamlit URL here after deployment)*  
+> **Live App:** *(https://cs10022200171-6mdjvbdwzy6optdzhgkrsa.streamlit.app/)*  
 > **Video Walkthrough:** *(add your YouTube/Drive link here)*
 
 ---
