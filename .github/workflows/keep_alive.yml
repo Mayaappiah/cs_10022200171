@@ -1,0 +1,39 @@
+name: Keep Streamlit App Alive
+
+# Runs every 30 minutes, 24/7, forever — prevents Streamlit Cloud from sleeping the app.
+# Also runs on every push and can be triggered manually from the GitHub Actions tab.
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes, every hour, every day
+  push:
+    branches: [main]
+  workflow_dispatch:           # manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    name: Ping Streamlit App
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Wake up the app
+        run: |
+          echo "Pinging Streamlit app at $(date -u)"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 60 \
+            --retry 3 \
+            --retry-delay 10 \
+            "https://cs10022200171-6mdjvbdwzy6optdzhgkrsa.streamlit.app/")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "App is alive and responding."
+          else
+            echo "App returned status $STATUS — it may be waking up. That is OK."
+          fi
+
+      - name: Second ping (ensures app fully wakes from cold start)
+        run: |
+          sleep 15
+          curl -s -o /dev/null --max-time 60 \
+            "https://cs10022200171-6mdjvbdwzy6optdzhgkrsa.streamlit.app/" \
+            && echo "Second ping OK" || echo "Second ping failed (non-fatal)"
