@@ -32,6 +32,14 @@ DATA_DIR     = os.path.join(BASE_DIR, "data")
 ELECTION_CSV = os.path.join(DATA_DIR, "Ghana_Election_Result.csv")
 BUDGET_PDF   = os.path.join(DATA_DIR, "2025-Budget-Statement-and-Economic-Policy_v4.pdf")
 DEFAULT_TOP_K = 5
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+
+# ── API key — loaded from Streamlit Secrets only ─────────────────────────────
+def _get_api_key() -> str:
+    try:
+        return st.secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        return ""
 
 # ── page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -71,59 +79,9 @@ with st.sidebar:
 
     st.divider()
 
-    # Auto-load from Streamlit Cloud secrets if available
-    _secret_key = ""
-    try:
-        _secret_key = st.secrets.get("ANTHROPIC_API_KEY", "")
-    except Exception:
-        pass
-
-    api_key = st.text_input(
-        "🔑 Anthropic API Key",
-        value=_secret_key,
-        type="password",
-        help="Paste your Claude API key. On Streamlit Cloud set ANTHROPIC_API_KEY in Secrets.",
-    )
-    model = st.selectbox("🤖 Model", [
-        "claude-haiku-4-5-20251001",
-        "claude-sonnet-4-6",
-        "claude-opus-4-7",
-    ])
-    top_k    = st.slider("📚 Top-K documents", 1, 10, DEFAULT_TOP_K)
+    top_k      = st.slider("📚 Top-K documents", 1, 10, DEFAULT_TOP_K)
     use_hybrid = st.toggle("🔀 Hybrid search (keyword + vector)", value=True)
     rebuild    = st.button("🔄 Rebuild Index")
-
-    st.divider()
-    st.subheader("🏗️ Architecture")
-    st.markdown("""
-```
-User Query
-    │
-    ▼
-[Query Expansion]
-    │
-    ▼
-[FAISS Vector Store] ◄── Embeddings
-    │                     (MiniLM-L6-v2)
-    ▼
-[Hybrid Re-rank]
-    │
-    ▼
-[Context Selection]
-    │
-    ▼
-[Prompt Builder] ◄── Conversation Memory
-    │
-    ▼
-[Claude LLM]
-    │
-    ▼
-Response + Logs
-```
-**Data sources:**
-- 🗳️ Ghana Election Results CSV
-- 📊 2025 Budget Statement PDF
-""")
 
 # ── session state ─────────────────────────────────────────────────────────────
 if "memory"   not in st.session_state: st.session_state.memory   = ConversationMemory()
@@ -136,7 +94,7 @@ def load_store(force: bool = False):
     return build_index(ELECTION_CSV, BUDGET_PDF, force_rebuild=force)
 
 # ── tabs — rendered IMMEDIATELY before any loading ───────────────────────────
-tab_chat, tab_eval, tab_logs = st.tabs(["💬 Chat", "⚖️ RAG vs LLM", "📋 Logs"])
+tab_chat, tab_eval, tab_logs, tab_arch = st.tabs(["💬 Chat", "⚖️ RAG vs LLM", "📋 Logs", "🏗️ Architecture"])
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 — CHAT
@@ -171,8 +129,9 @@ with tab_chat:
     query = st.chat_input("Ask about elections or the 2025 budget …")
 
     if query:
+        api_key = _get_api_key()
         if not api_key:
-            st.warning("⚠️ Please enter your Anthropic API key in the sidebar.")
+            st.error("⚠️ API key not configured. Ask your administrator to set ANTHROPIC_API_KEY in Streamlit Secrets.")
             st.stop()
 
         st.session_state.messages.append({"role": "user", "content": query})
@@ -188,7 +147,7 @@ with tab_chat:
                     top_k=top_k,
                     use_hybrid=use_hybrid,
                     conversation_history=st.session_state.memory.get_recent(),
-                    model=model,
+                    model=DEFAULT_MODEL,
                 )
             st.markdown(result["response"])
 
@@ -241,8 +200,9 @@ with tab_eval:
     final_q     = custom_q.strip() or eval_query
 
     if st.button("🔍 Compare") and final_q:
+        api_key = _get_api_key()
         if not api_key:
-            st.warning("⚠️ Please enter your Anthropic API key in the sidebar.")
+            st.error("⚠️ API key not configured. Ask your administrator to set ANTHROPIC_API_KEY in Streamlit Secrets.")
             st.stop()
         if st.session_state.store is None:
             st.warning("⚠️ Please visit the Chat tab first to load the index.")
@@ -255,7 +215,7 @@ with tab_eval:
             st.subheader("✅ RAG Response")
             with st.spinner("Running RAG pipeline …"):
                 rag_result = run_rag(final_q, store, api_key, top_k=top_k,
-                                     use_hybrid=use_hybrid, model=model)
+                                     use_hybrid=use_hybrid, model=DEFAULT_MODEL)
             st.success(rag_result["response"])
             st.caption(f"Retrieved {len(rag_result['retrieved'])} chunks | "
                        f"Retrieval: {rag_result['retrieval_ms']} ms")
@@ -267,7 +227,7 @@ with tab_eval:
         with col_llm:
             st.subheader("⚠️ Pure LLM (No Retrieval)")
             with st.spinner("Calling LLM directly …"):
-                llm_response = run_pure_llm(final_q, api_key, model=model)
+                llm_response = run_pure_llm(final_q, api_key, model=DEFAULT_MODEL)
             st.warning(llm_response)
             st.caption("No document retrieval — answer from model training data only")
 
@@ -308,3 +268,98 @@ with tab_logs:
             st.info("No logs yet — ask a question in the Chat tab first.")
     else:
         st.info("No log file found — ask a question in the Chat tab first.")
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 4 — ARCHITECTURE
+# ════════════════════════════════════════════════════════════════════════════
+with tab_arch:
+    st.header("🏗️ System Architecture")
+    st.caption("CS4241 · Introduction to Artificial Intelligence · ACity 2026")
+    st.caption("**Maame Yaa Adumaba Appiah** | Index: 10022200171")
+
+    st.divider()
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("Pipeline Flow")
+        st.code("""
+User Query
+    │
+    ▼
+[Query Expansion]
+    │
+    ▼
+[FAISS Vector Store] ◄── Embeddings
+    │                     (MiniLM-L6-v2)
+    ▼
+[Hybrid Re-rank]
+ ├── Vector Score (cosine)
+ └── Keyword Score (×2 numeric boost)
+    │
+    ▼
+[Context Selection]   Top-K chunks
+    │
+    ▼
+[Prompt Builder] ◄── Conversation Memory
+    │                 (last 6 turns)
+    ▼
+[Claude LLM]
+(claude-haiku-4-5)
+    │
+    ▼
+Response + Logs
+""", language="text")
+
+    with col2:
+        st.subheader("Components")
+        st.markdown("""
+**Part A — Data Engineering**
+- Ghana Election Results CSV (1992–2020)
+- Ghana 2025 Budget Statement PDF
+- UTF-8 BOM handling, non-breaking space cleanup
+- Paragraph-aware chunking (max 800 chars)
+
+**Part B — Custom Retrieval (FAISS)**
+- `all-MiniLM-L6-v2` sentence embeddings (384-dim)
+- `IndexFlatIP` — cosine similarity via normalised inner product
+- Candidate pool of 200 → re-ranked to Top-K
+- Hybrid search: vector + keyword scoring
+
+**Part C — Prompt Engineering**
+- System role with strict grounding instructions
+- Hallucination guard: *"only answer from context"*
+- Context window management (token budget)
+- Source attribution in every response
+
+**Part D — RAG Pipeline**
+- Per-stage latency logging (retrieval ms / generation ms)
+- JSONL audit log for every query
+- Cached FAISS index (auto-rebuilds on failure)
+
+**Part E — Critical Evaluation**
+- Side-by-side RAG vs Pure LLM comparison
+- Adversarial test queries (out-of-scope years, misleading prompts)
+
+**Part G — Innovation: Conversation Memory**
+- Sliding window of last 6 turns
+- Injected into every prompt for contextual follow-ups
+""")
+
+    st.divider()
+    st.subheader("📦 Data Sources")
+    col3, col4 = st.columns(2)
+    with col3:
+        st.info("""
+🗳️ **Ghana Election Results CSV**
+- Presidential elections 1992–2020
+- Region-level vote counts & percentages
+- ~98 chunks after processing
+""")
+    with col4:
+        st.info("""
+📊 **2025 Budget Statement PDF**
+- Ghana Government Budget Statement
+- Revenue, expenditure, GDP targets
+- ~670 chunks after processing
+""")
